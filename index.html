@@ -4,11 +4,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Memory Calendar - Photo Diary</title>
+    <title>Memory Calendar</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background: #FDF8F3; color: #2D1810; padding: 20px; }
-        .calendar { max-width: 800px; margin: 0 auto; background: white; border-radius: 20px; box-shadow: 0 10px 40px rgba(0,0,0,0.1); overflow: hidden; }
+        .calendar { max-width: 800px; margin: 0 auto; background: white; border-radius: 20px; box-shadow: 0 10px 40px rgba(0,0,0,0.1); overflow: hidden; position: relative; }
         .header { background: #D4A574; color: white; padding: 20px; text-align: center; }
         .month-nav { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; }
         .month-nav button { background: rgba(255,255,255,0.2); border: none; color: white; font-size: 20px; padding: 8px 16px; border-radius: 8px; cursor: pointer; }
@@ -20,33 +20,35 @@
         .day.other-month { color: #ccc; }
         .has-event { position: relative; }
         .has-event::after { content: ''; position: absolute; bottom: 4px; width: 6px; height: 6px; background: #D4A574; border-radius: 50%; }
-        .day.selected.has-event::after { background: white; }
         .events-panel { padding: 20px; border-top: 1px solid #E8DDD4; max-height: 400px; overflow-y: auto; }
         .add-event { background: #D4A574; color: white; border: none; padding: 12px 20px; border-radius: 12px; cursor: pointer; margin-bottom: 16px; width: 100%; font-size: 16px; }
         .event { background: #FDF8F3; padding: 12px; margin-bottom: 12px; border-radius: 12px; border-left: 3px solid #D4A574; }
         .event-title { font-weight: bold; font-size: 16px; margin-bottom: 4px; }
         .event-desc { font-size: 14px; color: #666; margin-bottom: 8px; }
-        .event-photos { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
-        .event-photo { width: 60px; height: 60px; object-fit: cover; border-radius: 8px; cursor: pointer; }
         .modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 1000; }
         .modal-content { background: white; border-radius: 16px; padding: 20px; max-width: 90%; width: 450px; max-height: 80%; overflow-y: auto; }
         .modal input, .modal textarea { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #E8DDD4; border-radius: 8px; font-family: inherit; }
-        .photo-preview { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0; }
-        .photo-preview img { width: 80px; height: 80px; object-fit: cover; border-radius: 8px; }
         .modal-buttons { display: flex; gap: 12px; margin-top: 16px; }
         .modal-buttons button { flex: 1; padding: 12px; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; }
         .btn-primary { background: #D4A574; color: white; }
         .btn-secondary { background: #E8DDD4; color: #2D1810; }
         .btn-danger { background: #EF4444; color: white; }
-        .photo-upload-btn { background: #B8956A; color: white; border: none; padding: 10px; border-radius: 8px; margin: 8px 0; cursor: pointer; width: 100%; }
-        .fullscreen-photo { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.9); display: flex; justify-content: center; align-items: center; z-index: 2000; cursor: pointer; }
-        .fullscreen-photo img { max-width: 90%; max-height: 90%; object-fit: contain; }
+        .vault-btn { background: transparent; border: 2px dashed #D4A574; color: #D4A574; padding: 12px; border-radius: 12px; cursor: pointer; margin-top: 16px; width: 100%; font-size: 14px; }
+        .vault-section { display: none; margin-top: 20px; padding: 16px; background: #F3EDE7; border-radius: 12px; }
+        .vault-section.active { display: block; }
+        .media-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 12px; margin-top: 12px; }
+        .media-item { position: relative; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .media-item img, .media-item video { width: 100%; height: 100px; object-fit: cover; }
+        .media-item button { position: absolute; top: 4px; right: 4px; background: #EF4444; color: white; border: none; border-radius: 50%; width: 24px; height: 24px; cursor: pointer; font-size: 12px; }
+        .add-media-btn { background: #B8956A; color: white; border: none; padding: 10px; border-radius: 8px; cursor: pointer; width: 100%; margin-top: 12px; }
+        .lock-status { text-align: center; padding: 8px; color: #999; font-size: 12px; font-style: italic; }
+        .double-tap-hint { text-align: center; padding: 4px; color: #ccc; font-size: 10px; }
     </style>
 </head>
 <body>
-    <div class="calendar">
+    <div class="calendar" id="calendarContainer">
         <div class="header">
-            <h1>📸 Memory Calendar</h1>
+            <h1>📅 Memory Calendar</h1>
             <div class="month-nav">
                 <button onclick="prevMonth()">←</button>
                 <h2 id="monthYear"></h2>
@@ -58,37 +60,128 @@
         </div>
         <div class="days" id="days"></div>
         <div class="events-panel">
-            <button class="add-event" onclick="openModal()">+ Add Event with Photo</button>
+            <button class="add-event" onclick="openEventModal()">+ Add Memory</button>
             <div id="eventsList"></div>
+            
+            <div class="lock-status" id="lockStatus">🔒 Vault locked</div>
+            <div class="double-tap-hint">(double-tap anywhere to unlock vault)</div>
+            
+            <div id="vaultSection" class="vault-section">
+                <h3>🔓 Secret Vault</h3>
+                <p style="font-size: 12px; color: #666;">Your private photos & videos</p>
+                <div id="mediaGrid" class="media-grid"></div>
+                <button class="add-media-btn" onclick="addMedia()">+ Add Photo or Video</button>
+            </div>
         </div>
     </div>
 
-    <!-- Add Event Modal -->
+    <!-- Event Modal -->
     <div id="eventModal" class="modal">
         <div class="modal-content">
             <h3>Add Memory</h3>
             <input type="text" id="eventTitle" placeholder="Event title" required>
             <textarea id="eventDesc" placeholder="Description" rows="3"></textarea>
-            <button class="photo-upload-btn" onclick="uploadPhoto()">📷 Add Photo</button>
-            <div id="photoPreview" class="photo-preview"></div>
             <div class="modal-buttons">
-                <button class="btn-secondary" onclick="closeModal()">Cancel</button>
+                <button class="btn-secondary" onclick="closeEventModal()">Cancel</button>
                 <button class="btn-primary" onclick="saveEvent()">Save</button>
             </div>
         </div>
     </div>
 
-    <!-- Fullscreen Photo Viewer -->
-    <div id="fullscreenViewer" class="fullscreen-photo" style="display: none;" onclick="closeFullscreen()">
-        <img id="fullscreenImage" src="">
-    </div>
-
     <script>
+        // Calendar data
         let currentDate = new Date();
         let selectedDate = new Date().toISOString().split('T')[0];
         let events = JSON.parse(localStorage.getItem('events') || '{}');
-        let currentPhotos = [];
-
+        let vault = JSON.parse(localStorage.getItem('vault') || '{"media":[]}');
+        
+        // Vault lock state
+        let vaultUnlocked = false;
+        let doubleTapTimer = null;
+        
+        // Setup double-tap detection
+        const calendarContainer = document.getElementById('calendarContainer');
+        calendarContainer.addEventListener('dblclick', function(e) {
+            e.stopPropagation();
+            toggleVault();
+        });
+        
+        function toggleVault() {
+            vaultUnlocked = !vaultUnlocked;
+            const vaultSection = document.getElementById('vaultSection');
+            const lockStatus = document.getElementById('lockStatus');
+            
+            if (vaultUnlocked) {
+                vaultSection.classList.add('active');
+                lockStatus.innerHTML = '🔓 Vault unlocked (double-tap to lock)';
+                renderVault();
+            } else {
+                vaultSection.classList.remove('active');
+                lockStatus.innerHTML = '🔒 Vault locked (double-tap to unlock)';
+            }
+        }
+        
+        function renderVault() {
+            const mediaGrid = document.getElementById('mediaGrid');
+            if (!vaultUnlocked) return;
+            
+            if (!vault.media || vault.media.length === 0) {
+                mediaGrid.innerHTML = '<p style="color: #999; text-align: center; grid-column: 1/-1;">No private media yet. Tap + to add.</p>';
+                return;
+            }
+            
+            mediaGrid.innerHTML = vault.media.map((item, idx) => `
+                <div class="media-item">
+                    ${item.type === 'video' ? 
+                        `<video src="${item.url}" controls></video>` : 
+                        `<img src="${item.url}" onclick="viewFullscreen('${item.url}')">`
+                    }
+                    <button onclick="deleteMedia(${idx})">×</button>
+                </div>
+            `).join('');
+        }
+        
+        function addMedia() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = 'image/*,video/*';
+            input.onchange = function(e) {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = function(event) {
+                        const mediaType = file.type.startsWith('video') ? 'video' : 'image';
+                        vault.media.push({
+                            url: event.target.result,
+                            type: mediaType,
+                            date: new Date().toISOString()
+                        });
+                        localStorage.setItem('vault', JSON.stringify(vault));
+                        renderVault();
+                    };
+                    reader.readAsDataURL(file);
+                }
+            };
+            input.click();
+        }
+        
+        function deleteMedia(index) {
+            if (confirm('Delete this private media?')) {
+                vault.media.splice(index, 1);
+                localStorage.setItem('vault', JSON.stringify(vault));
+                renderVault();
+            }
+        }
+        
+        function viewFullscreen(url) {
+            const win = window.open();
+            win.document.write(`
+                <html><body style="margin:0; background:black; display:flex; justify-content:center; align-items:center; height:100vh;">
+                <img src="${url}" style="max-width:100%; max-height:100%;" onclick="window.close()">
+                </body></html>
+            `);
+        }
+        
         function renderCalendar() {
             const year = currentDate.getFullYear();
             const month = currentDate.getMonth();
@@ -139,59 +232,19 @@
                 <div class="event">
                     <div class="event-title">📌 ${escapeHtml(event.title)}</div>
                     ${event.description ? `<div class="event-desc">${escapeHtml(event.description)}</div>` : ''}
-                    ${event.photos && event.photos.length > 0 ? `
-                        <div class="event-photos">
-                            ${event.photos.map(photo => `<img src="${photo}" class="event-photo" onclick="viewPhoto('${photo}')">`).join('')}
-                        </div>
-                    ` : ''}
                     <button class="btn-danger" style="margin-top: 8px; padding: 4px 8px; font-size: 12px;" onclick="deleteEvent('${selectedDate}', ${idx})">Delete</button>
                 </div>
             `).join('');
         }
 
-        function openModal() {
+        function openEventModal() {
             document.getElementById('eventModal').style.display = 'flex';
             document.getElementById('eventTitle').value = '';
             document.getElementById('eventDesc').value = '';
-            currentPhotos = [];
-            document.getElementById('photoPreview').innerHTML = '';
         }
 
-        function closeModal() {
+        function closeEventModal() {
             document.getElementById('eventModal').style.display = 'none';
-        }
-
-        function uploadPhoto() {
-            const input = document.createElement('input');
-            input.type = 'file';
-            input.accept = 'image/*';
-            input.onchange = function(e) {
-                const file = e.target.files[0];
-                if (file) {
-                    const reader = new FileReader();
-                    reader.onload = function(event) {
-                        currentPhotos.push(event.target.result);
-                        updatePhotoPreview();
-                    };
-                    reader.readAsDataURL(file);
-                }
-            };
-            input.click();
-        }
-
-        function updatePhotoPreview() {
-            const preview = document.getElementById('photoPreview');
-            preview.innerHTML = currentPhotos.map((photo, idx) => `
-                <div style="position: relative;">
-                    <img src="${photo}" style="width: 80px; height: 80px; object-fit: cover; border-radius: 8px;">
-                    <button onclick="removePhoto(${idx})" style="position: absolute; top: -8px; right: -8px; background: #EF4444; color: white; border: none; border-radius: 50%; width: 24px; height: 24px; cursor: pointer;">×</button>
-                </div>
-            `).join('');
-        }
-
-        function removePhoto(index) {
-            currentPhotos.splice(index, 1);
-            updatePhotoPreview();
         }
 
         function saveEvent() {
@@ -207,12 +260,11 @@
             events[selectedDate].push({
                 title: title,
                 description: desc,
-                photos: [...currentPhotos],
                 date: new Date().toISOString()
             });
             
             localStorage.setItem('events', JSON.stringify(events));
-            closeModal();
+            closeEventModal();
             renderCalendar();
         }
 
@@ -223,15 +275,6 @@
                 localStorage.setItem('events', JSON.stringify(events));
                 renderCalendar();
             }
-        }
-
-        function viewPhoto(photoSrc) {
-            document.getElementById('fullscreenImage').src = photoSrc;
-            document.getElementById('fullscreenViewer').style.display = 'flex';
-        }
-
-        function closeFullscreen() {
-            document.getElementById('fullscreenViewer').style.display = 'none';
         }
 
         function prevMonth() {
